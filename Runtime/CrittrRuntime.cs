@@ -1,26 +1,10 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
-using System.Runtime.Serialization;
 using System.Text;
-using System.Threading.Tasks;
-using UnityEditor;
-using UnityEditor.Build.Content;
-using UnityEditor.Build.Reporting;
-using UnityEditor.MemoryProfiler;
-using UnityEditor.VersionControl;
-using UnityEditorInternal;
 using UnityEngine;
-using UnityEngine.Events;
 using UnityEngine.Networking;
-using UnityEngine.UI;
-using Crittr.Editor;
 
 namespace Crittr {
     [Serializable]
@@ -81,19 +65,21 @@ namespace Crittr {
         public static CrittrRuntime Instance { get { return _instance.Value; } }
         private bool _isInitialized;
         private List<string> _logs = new List<string>();
-        private List<string> _attachments = new List<string>();
-        private CrittrConfig _config;
 
+        private string _connectionURI = "";
+        private int _maxLogs = 100;
+        private bool _isVerbose = false;
 
-        public event Action onSendReportRequest;
-        public event Action<SuccessResponse> onSendReportSuccess;
-        public event Action<ErrorResponse> onSendReportFailure;
+        public event Action<Report> OnReportSend;
+        public event Action<Report, SuccessResponse> OnSendReportSuccess;
+        public event Action<Report, ErrorResponse> OnSendReportFailure;
+        public event Action<string, string> OnExceptionError;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void OnLoadMethod()
         {
-            CrittrRuntime.Instance.Init();
-            Application.quitting += () => CrittrRuntime.Instance.Destroy();
+            Instance.Init();
+            Application.quitting += () => Instance.Destroy();
         }
 
         public void Init() {
@@ -101,11 +87,9 @@ namespace Crittr {
                 return;
             }
 
-            _config = CrittrConfig.Instance;
             _isInitialized = true;
             _logs = new List<string>();
-            _attachments = new List<string>();
-            Application.logMessageReceived += _handleLogs;
+            Application.logMessageReceived += _handleLog;
         }
 
         public void Destroy() {
@@ -113,47 +97,81 @@ namespace Crittr {
                 return;
             }
 
-            _config = null;
             _isInitialized = false;
-            Application.logMessageReceived -= _handleLogs;
+            Application.logMessageReceived -= _handleLog;
             _logs = new List<string>();
         }
 
-        public IEnumerator CaptureScreenshot() { 
+        public IEnumerator CaptureScreenshot(Report report) { 
             yield return new WaitForEndOfFrame();
             var timeNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            string filename = $"Crittr_Screenshot_{timeNow}.png";
-             #if UNITY_EDITOR
-            var path = Application.dataPath + "/../" + filename;
-#else
-            var path = Application.dataPath + "/" + filename;
-#endif
-            ScreenCapture.CaptureScreenshot(filename);
-            AddAttachment(path);
+            string filename = $"Crittr_Screenshot_{timeNow}.jpg";
+            Texture2D texture = ScreenCapture.CaptureScreenshotAsTexture();
+            texture.name = filename;
+            report.screenshots.Add(texture);
         }
 
-        private void _handleLogs(string message, string stackTrace, LogType logType) {
+        private void _handleLog(string message, string stackTrace, LogType logType) {
             if (!_isInitialized) {
-                // TODO: Add error logging.
                 return;
             }
-            _logs.Add(message);
+            if (logType == LogType.Exception)
+            {
+                OnExceptionError?.Invoke(message, stackTrace);
+                _logs.Add(message);
+                _logs.Add(stackTrace);
+            }
+            else
+            {
+                _logs.Add(message);
+            }
+            while (_logs.Count > _maxLogs) {
+                _logs.RemoveAt(0);
+            }
         }
 
-        public void AddAttachment(string path) {
-            _attachments.Add(path);
+        public void SetConnectionURI(string connectionURI) {
+            if (_isInitialized) {
+                return;
+            }
+
+            _connectionURI = connectionURI;
         }
+
+        public void SetMaxLogs(int maxLogs) {
+            if (_isInitialized) {
+                return;
+            }
+
+            _maxLogs = 1;
+            if (_maxLogs > 1) {
+                _maxLogs = maxLogs;
+            }
+        }
+
+        public void SetIsVerboseMode(bool isVerbose) {
+            if (_isInitialized) {
+                return;
+            }
+
+            _isVerbose = isVerbose;
+        }
+
 
         public Report NewReport() {
-            return new Crittr.Report();
+            return new Report();
         }
 
-        public AsyncOperation SendReport(Report report) {
-            // TODO: Set max length of logs.
-            onSendReportRequest?.Invoke();
+        public IEnumerator SendReport(Report report, bool withScreenShot) {
+            if (withScreenShot) {
+                yield return CaptureScreenshot(report);
+            }
+            _sendReport(report);
+        }
 
+        public AsyncOperation _sendReport(Report report) {
             report.SetLogs(_logs);
-            APIProperties apiProperties = new APIProperties(_config.ConnectionURI);
+            APIProperties apiProperties = new APIProperties(_connectionURI);
             var builder = apiProperties.BaseURI;
             builder.Path = $"/projects/{apiProperties.projectId}/reports";
             var www = new UnityWebRequest(builder.ToString()) { method = "POST" };
@@ -165,58 +183,80 @@ namespace Crittr {
             www.SetRequestHeader("Content-Type", "application/json");
             www.downloadHandler = new DownloadHandlerBuffer();
             UnityWebRequestAsyncOperation wwwOp = www.SendWebRequest();
-            wwwOp.completed += _handleSendMessageCompleted;
+            wwwOp.completed += _bindSendMessageCompleted(report);
+
+            OnReportSend?.Invoke(report);
             return wwwOp;
         }
 
 
-        private void _handleSendMessageCompleted(AsyncOperation op) {
-            UnityWebRequestAsyncOperation wwwOp = (UnityWebRequestAsyncOperation) op;
-            var www = wwwOp.webRequest;
-            if (www.isNetworkError || www.isHttpError || www.responseCode != 200)
+        private Action<AsyncOperation> _bindSendMessageCompleted(Report report) {
+            return (AsyncOperation op) =>
             {
-                if (_config.Verbose) {
-                    UnityEngine.Debug.LogError("Error sending report: " + www.downloadHandler.text);
+                UnityWebRequestAsyncOperation wwwOp = (UnityWebRequestAsyncOperation)op;
+                var www = wwwOp.webRequest;
+                if (www.isNetworkError || www.isHttpError || www.responseCode != 200)
+                {
+                    if (_isVerbose)
+                    {
+                        Debug.LogError("Error sending report: " + www.downloadHandler.text);
+                    }
+                    ErrorResponse errorResponse = JsonUtility.FromJson<ErrorResponse>(www.downloadHandler.text);
+                    OnSendReportFailure?.Invoke(report, errorResponse);
+                    return;
                 }
-                ErrorResponse errorResponse = JsonUtility.FromJson<ErrorResponse>(www.downloadHandler.text);
-                onSendReportFailure?.Invoke(errorResponse);
-                return;
-            }
 
-            var response = JsonUtility.FromJson<SuccessResponse>(www.downloadHandler.text);
-            onSendReportSuccess?.Invoke(response);
-            _uploadAttachments(response.links.upload_attachment);
+                var response = JsonUtility.FromJson<SuccessResponse>(www.downloadHandler.text);
+                OnSendReportSuccess?.Invoke(report, response);
+                _uploadAttachments(report, response.links.upload_attachment);
+            };
         }
 
-        private void _uploadAttachments(RefAndMethod uploadLink) {
-            // TODO: Some kind of wait group to log when all the attachments succeed
-            // and remove their references.
-            foreach (var filename in _attachments) {
-                UnityWebRequestAsyncOperation wwwOp = _uploadAttachment(filename, uploadLink);
-                // TODO: Add logging if failed.
-                wwwOp.completed += (AsyncOperation op) => {
-                    var uwrOp = (UnityWebRequestAsyncOperation)op;
-                    var www = uwrOp.webRequest;
-                    if (_config.Verbose) {
-                        UnityEngine.Debug.LogWarning($"Upload attachment response: {www.downloadHandler.text}");
-                    }
-                    
-                };
-            }
+        private void _uploadAttachments(Report report, RefAndMethod uploadLink) {
+            foreach (var texture in report.screenshots) {
+                UnityWebRequestAsyncOperation wwwOp = _uploadScreenshot(texture, uploadLink);
 
-            // Remove attachments.
-            _attachments = new List<string>();
+                if (_isVerbose) {
+                    wwwOp.completed += (AsyncOperation op) =>
+                    {
+                        var uwrOp = (UnityWebRequestAsyncOperation)op;
+                        var www = uwrOp.webRequest;
+                        Debug.Log($"Upload attachment response: {www.downloadHandler.text}");
+                    };
+                }
+            }
+            foreach (var filename in report.attachments) {
+                UnityWebRequestAsyncOperation wwwOp = _uploadAttachment(filename, uploadLink);
+
+                if (_isVerbose) {
+                    wwwOp.completed += (AsyncOperation op) =>
+                    {
+                        var uwrOp = (UnityWebRequestAsyncOperation)op;
+                        var www = uwrOp.webRequest;
+                        Debug.Log($"Upload attachment response: {www.downloadHandler.text}");
+                    };
+                }
+            }
         }
 
         private UnityWebRequestAsyncOperation _uploadAttachment(string path, RefAndMethod uploadLink) {
             var filename = Path.GetFileName(path);
             byte[] data = File.ReadAllBytes(path);
+            return _uploadFile(filename, data, uploadLink);
+        }
+        private UnityWebRequestAsyncOperation _uploadScreenshot(Texture2D texture, RefAndMethod uploadLink) {
+            byte[] data = texture.EncodeToJPG();
+            return _uploadFile(texture.name, data, uploadLink);
+        }
+
+        private UnityWebRequestAsyncOperation _uploadFile(string filename, byte[] data, RefAndMethod uploadLink) {
             List<IMultipartFormSection> formData = new List<IMultipartFormSection>();
             formData.Add(new MultipartFormFileSection("attachment_file", data, filename, ""));
 
-            APIProperties apiProperties = new APIProperties(_config.ConnectionURI);
+            APIProperties apiProperties = new APIProperties(_connectionURI);
             var url = apiProperties.BaseURI + uploadLink.href;
             var www = UnityWebRequest.Post(url, formData);
+
             // 60 Seconds timeout.
             www.timeout = 60;
             www.downloadHandler = new DownloadHandlerBuffer();

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -102,7 +101,7 @@ namespace Crittr
     [Serializable]
     public class SDK
     {
-        public string version = "0.0.1";
+        public string version = "0.1.0";
         public string platform = "unity";
     }
 
@@ -112,13 +111,25 @@ namespace Crittr
         public System system;
         public App app;
         public List<string> logs;
-        public string tags;
-        public string extras;
         public User user;
         public SDK sdk;
 
+        public string title = "";
+        public string description = "";
+        public string category = "bug";
+        public string tags;
+        public string extras;
+
+        [NonSerialized]
+        public List<Texture2D> screenshots;
+
+        [NonSerialized]
+        public List<string> attachments;
+
         public Report()
         {
+            attachments = new List<string>();
+            screenshots = new List<Texture2D>();
             system = new System();
             app = new App();
             user = new User();
