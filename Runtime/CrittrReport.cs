@@ -84,7 +84,7 @@ namespace Crittr
         {
             version = Application.version;
             env = "release";
-            if (UnityEngine.Debug.isDebugBuild)
+            if (Debug.isDebugBuild)
             {
                 env = "development";
             }

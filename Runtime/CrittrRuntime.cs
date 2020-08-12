@@ -21,6 +21,7 @@ namespace Crittr {
     [Serializable]
     public struct SuccessResponse {
         public string location;
+        public string qr_code_location;
         public SuccessLinks links;
     }
     
@@ -40,21 +41,19 @@ namespace Crittr {
     public class APIProperties {
         public string scheme;
         public string host;
+        public string path;
         public int port;
-        public int projectId;
         public string apiKey;
 
         public UriBuilder BaseURI { get { return new UriBuilder(scheme, host, port); } }
 
         public APIProperties(string connectionURI) {
             Uri uri = new Uri(connectionURI);
-            var splitPath = uri.LocalPath.Split('/');
-            var _projectId = Int32.Parse(splitPath[splitPath.Length - 2]);
 
             scheme = uri.Scheme;
             host = uri.Host;
             port = uri.Port;
-            projectId = _projectId;
+            path = uri.LocalPath;
             apiKey = uri.UserInfo;
         }
     }
@@ -65,6 +64,8 @@ namespace Crittr {
         public static CrittrRuntime Instance { get { return _instance.Value; } }
         private bool _isInitialized;
         private List<string> _logs = new List<string>();
+        private const float timeBetween = 0.6f;
+        private float _lastErrorSent = 0;
 
         private string _connectionURI = "";
         private int _maxLogs = 100;
@@ -115,11 +116,12 @@ namespace Crittr {
             if (!_isInitialized) {
                 return;
             }
-            if (logType == LogType.Exception)
+            if (logType == LogType.Exception && Time.time - _lastErrorSent > timeBetween)
             {
                 OnExceptionError?.Invoke(message, stackTrace);
                 _logs.Add(message);
                 _logs.Add(stackTrace);
+                _lastErrorSent = Time.time;
             }
             else
             {
@@ -131,7 +133,7 @@ namespace Crittr {
         }
 
         public void SetConnectionURI(string connectionURI) {
-            if (_isInitialized) {
+            if (!_isInitialized) {
                 return;
             }
 
@@ -139,18 +141,18 @@ namespace Crittr {
         }
 
         public void SetMaxLogs(int maxLogs) {
-            if (_isInitialized) {
+            if (!_isInitialized) {
                 return;
             }
 
             _maxLogs = 1;
-            if (_maxLogs > 1) {
+            if (maxLogs > 1) {
                 _maxLogs = maxLogs;
             }
         }
 
         public void SetIsVerboseMode(bool isVerbose) {
-            if (_isInitialized) {
+            if (!_isInitialized) {
                 return;
             }
 
@@ -173,7 +175,8 @@ namespace Crittr {
             report.SetLogs(_logs);
             APIProperties apiProperties = new APIProperties(_connectionURI);
             var builder = apiProperties.BaseURI;
-            builder.Path = $"/projects/{apiProperties.projectId}/reports";
+            builder.Path = apiProperties.path;
+
             var www = new UnityWebRequest(builder.ToString()) { method = "POST" };
             www.SetRequestHeader("X-Crittr-Client-Key", apiProperties.apiKey);
 
@@ -183,14 +186,14 @@ namespace Crittr {
             www.SetRequestHeader("Content-Type", "application/json");
             www.downloadHandler = new DownloadHandlerBuffer();
             UnityWebRequestAsyncOperation wwwOp = www.SendWebRequest();
-            wwwOp.completed += _bindSendMessageCompleted(report);
+            wwwOp.completed += bindSendReportCompleted(report);
 
             OnReportSend?.Invoke(report);
             return wwwOp;
         }
 
 
-        private Action<AsyncOperation> _bindSendMessageCompleted(Report report) {
+        private Action<AsyncOperation> bindSendReportCompleted(Report report) {
             return (AsyncOperation op) =>
             {
                 UnityWebRequestAsyncOperation wwwOp = (UnityWebRequestAsyncOperation)op;
@@ -199,10 +202,23 @@ namespace Crittr {
                 {
                     if (_isVerbose)
                     {
-                        Debug.LogError("Error sending report: " + www.downloadHandler.text);
+                        Debug.LogWarning("Error sending report: " + www.downloadHandler.text);
                     }
-                    ErrorResponse errorResponse = JsonUtility.FromJson<ErrorResponse>(www.downloadHandler.text);
-                    OnSendReportFailure?.Invoke(report, errorResponse);
+                    ErrorResponse errorResponse = new ErrorResponse {errors = new ErrorMessage[]{}, status = 500};
+                    try
+                    {
+                        errorResponse = JsonUtility.FromJson<ErrorResponse>(www.downloadHandler.text);
+                    }
+                    catch (Exception e) {
+                        if (_isVerbose)
+                        {
+                            Debug.LogWarning("Error generating error response" + e.ToString());
+                        }
+                    }
+                    finally
+                    {
+                        OnSendReportFailure?.Invoke(report, errorResponse);
+                    }
                     return;
                 }
 

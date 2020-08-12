@@ -24,26 +24,28 @@ public class CrittrSDK : MonoBehaviour
     [SerializeField]
     [Header("Connection URI with API Key")]
     public string ConnectionURI;
+
+    [Header("Options")]
+    public bool sendAutomaticReports = false;
+    [Range(1,100)]
+    public int maxLogs = 100;
     public bool isVerbose = true;
 
-    [Header("Automatically sends reports on exceptions and errors", order=1)]
-    public bool sendAutomaticReports = false;
-
-    public int maxLogs = 100;
-
-    [Header("Keyboard key to trigger manual report", order=1)]
+    [Header("Inputs to trigger manual reports", order=1)]
     public KeyCode keyboardInputTrigger = KeyCode.F8;
-
-    [Header("Controller keys to trigger manual report", order=1)]
     public List<KeyCode> controllerInputTriggers = new List<KeyCode> { KeyCode.JoystickButton0, KeyCode.JoystickButton4, KeyCode.JoystickButton5 };
 
+    [Header("Events triggered during the report lifecycle")]
+    [SerializeField]
+    public CrittrEventReport OnShowForm;
     [SerializeField]
     public CrittrEventReport OnReportSend;
     [SerializeField]
     public CrittrEventReportSuccess OnReportSuccess;
     [SerializeField]
     public CrittrEventReportFailure OnReportFailure;
-    private bool isSending = false;
+
+    private bool holdingTriggerKey = false;
 
 
     void Awake()
@@ -58,14 +60,30 @@ public class CrittrSDK : MonoBehaviour
         CrittrRuntime.Instance.OnExceptionError += HandleExceptionError;
     }
 
-    public virtual void PrepareReport()
+    public virtual void TriggeredManualReport()
     {
-        isSending = true;
         var report = CrittrRuntime.Instance.NewReport();
+        if (OnShowForm.GetPersistentEventCount() > 0)
+        {
+            OnShowForm?.Invoke(report);
+            return;
+        }
+
+        _defaultReportTriggered(report);
+    }
+
+    private void _defaultReportTriggered(Report report) { 
         SendReport(report, true);
     }
 
-    public void SendReport(Report report, bool withScreenshot) { 
+    public virtual void PopulateReport(Report report)
+    {
+        // Expects to be overridden.
+        // Add custom data to the report.
+    }
+
+    public void SendReport(Report report, bool withScreenshot) {
+        PopulateReport(report);
         StartCoroutine(CrittrRuntime.Instance.SendReport(report, withScreenshot));
     }
 
@@ -75,24 +93,22 @@ public class CrittrSDK : MonoBehaviour
         {
             Debug.Log("After constructing the report request");
         }
-        // A good place to pause the game...
+        // A good place to show a loading screen...
         OnReportSend?.Invoke(report);
     }
 
     public virtual void HandleReportSuccess(Report report, SuccessResponse response)
     {
-        isSending = false;
         if (isVerbose)
         {
             Debug.Log("The report was sent successfully: " + response.location);
         }
-        Application.OpenURL(response.location);
+
         OnReportSuccess?.Invoke(report, response);
     }
 
     public virtual void HandleReportFailure(Report report, ErrorResponse error)
     {
-        isSending = false;
         if (isVerbose)
         {
             Debug.Log("The report was not sent: " + error.status);
@@ -103,7 +119,6 @@ public class CrittrSDK : MonoBehaviour
     public virtual void HandleExceptionError(string message, string stackTrace)
     {
         if (!sendAutomaticReports) return;
-
         var report = CrittrRuntime.Instance.NewReport();
         report.category = "error";
         report.title = message;
@@ -118,14 +133,15 @@ public class CrittrSDK : MonoBehaviour
 
     public virtual void Update()
     {
-        if (isSending) {
-            return;
-        }
 
-        if (Input.GetKeyDown(keyboardInputTrigger))
+        if (!holdingTriggerKey && Input.GetKeyDown(keyboardInputTrigger))
         {
-            //PrepareReport();
-            Debug.Log("Pressed keyboard key");
+            TriggeredManualReport();
+            holdingTriggerKey = true;
+        }
+        if (Input.GetKeyUp(keyboardInputTrigger))
+        {
+            holdingTriggerKey = false;
         }
 
         var hasPressedControllerKeys = true;
@@ -134,10 +150,11 @@ public class CrittrSDK : MonoBehaviour
             var isKeyPressed = Input.GetKey(input);
             hasPressedControllerKeys = hasPressedControllerKeys && isKeyPressed;
         }
-        if (hasPressedControllerKeys)
+        if (!hasPressedControllerKeys) holdingTriggerKey = false;
+        if (!holdingTriggerKey && hasPressedControllerKeys)
         {
-            //PrepareReport();
-            Debug.Log("Pressed controller key");
+            TriggeredManualReport();
+            holdingTriggerKey = hasPressedControllerKeys;
         }
 
     }
