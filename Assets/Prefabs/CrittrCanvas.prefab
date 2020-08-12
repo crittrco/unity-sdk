@@ -1349,9 +1349,11 @@ MonoBehaviour:
   formScreen: {fileID: 9019647424723866858}
   successScreen: {fileID: 9019647424123877519}
   failureScreen: {fileID: 9019647423949989782}
-  crittrReporter: {fileID: 8321349631171449321, guid: 26d535b34994f2742a3760f9f1bae543,
-    type: 3}
+  crittrReporter: {fileID: 0}
   successQRCodeGO: {fileID: 9019647423059644525}
+  OnClearedScreens:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &9019647422987699469
 GameObject:
   m_ObjectHideFlags: 0

@@ -51,49 +51,13 @@ MonoBehaviour:
   controllerInputTriggers: 4a0100004e0100004f010000
   OnShowForm:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 9019647422948999181, guid: 855fc19c809de764bb3b5d3cb7eb2176,
-          type: 3}
-        m_MethodName: HandleShowForm
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
   OnReportSend:
     m_PersistentCalls:
       m_Calls: []
   OnReportSuccess:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 9019647422948999181, guid: 855fc19c809de764bb3b5d3cb7eb2176,
-          type: 3}
-        m_MethodName: HandleShowSuccess
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
   OnReportFailure:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 9019647422948999181, guid: 855fc19c809de764bb3b5d3cb7eb2176,
-          type: 3}
-        m_MethodName: HandleShowFailure
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
