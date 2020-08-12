@@ -26,27 +26,44 @@ release is ready*
 
 ### Using the SDK
 
-1. In your project's top level `Assets` folder, create a new folder `Resources` (if one doesn't already exist).
+#### Setting up in Unity
 
-2. In the `Resources` folder, right click to open the asset menu and select the `Crittr Config` option.
-    * A new file named `CrittrConfig` should have been created in the `Resources` folder.
-    * Left-click to inspect the `CrittrConfig` properties.
-    * Input the Connection URI for your project (you can find this in the project settings SDK section on [Crittr's dashboard](https://dashboard.crittr.co))
+CrittrReporter and CrittrCanvas prefabs exist in the `Assets/Prefabs` directory to help send your first report. CrittrReporter sends the reports, whereas CrittrCanvas displays the manual reports UI.
 
-#### Sending your first report
+#### Sending Automatic Reports
 
-A default CrittrReporter and CrittrCanvas prefab exist in the `Assets/Prefabs` directory to help send your first report. To use them:
-
-1. Add the prefabs to your Scene.
+1. Add the CrittrReporter prefab to your Scene.
 
 2. Add the Connection URI to the CrittrReporter prefab:
     * Scroll to the CrittrSDK script.
     * Input the Connection URI for your project (you can find this in the project settings SDK section on [Crittr's dashboard](https://dashboard.crittr.co))
 
-3. Run your game and then press `F8`. A screenshot of your game will be taken and a success screen should pop up with a link and QR code to update your report.
+3. Check the `Send Automatic Reports` in the CrittrSDK script Options.
+
+4. Run your game and throw an exception.
+    * If you get a log message with a location to your report on the dashboard, your report has been sent successfully. Go to the Crittr dashboard to see the report.
+    * If you got a log error, check that you have entered a valid connection uri.
+
+
+#### Sending Manual Reports
+
+1. Add the CrittrReporter and CrittrCanvas prefabs to your Scene as game objects.
+
+2. Add the Connection URI to the CrittrReporter game object:
+    * Scroll to the CrittrSDK script.
+    * Input the Connection URI for your project (you can find this in the project settings SDK section on [Crittr's dashboard](https://dashboard.crittr.co))
+
+3. In the CrittrReporter game objects's CrittrSDK script, add the CrittrCanvas game object from your Scene to the following report lifecycle events:
+    * On Show Form, select the `CrittrUIManager -> HandleShowForm` function.
+    * On Report Success, select the `CrittrUIManager -> HandleShowSuccess` function.
+    * On Report Failure, select the `CrittrUIManager -> HandleShowFailure` function.
+
+4. In the CrittrCanvas game object, scroll to the Crittr UI Manager script. Add the CrittrReporter game object to the Crittr Reporter selection. 
+
+5. Run your game and then press `F8`. A screenshot of your game will be taken and a success screen should pop up with a link and QR code to update your report.
     * If a screen does not pop up, check the logs to see if you have inputted the connection uri correctly.
     * If the failure screen shows, check that you have a valid connection uri.
 
-4. Update the report with a new title and description.
+6. Navigate to the report using the QR code or link, then edit it with a new title and description.
 
-5. That's it! You should be able to see a screenshot and the report in the reports list of the project.
+7. That's it! You should be able to see a screenshot and the report in the reports list of the project.
