@@ -126,6 +126,9 @@ namespace Crittr
         [NonSerialized]
         public List<string> attachments;
 
+        [NonSerialized]
+        private Dictionary<string, string> _tags = new Dictionary<string, string>();
+
         public Report()
         {
             attachments = new List<string>();
@@ -136,9 +139,20 @@ namespace Crittr
             sdk = new SDK();
         }
 
-        public void SetTags(Dictionary<string, string> _tags)
+        public void AddTag(string key, string value)
         {
-            tags = CrittrUtils.Json.Serialize(_tags);
+            _tags.Add(key, value);
+        }
+
+        public void DeleteTag(string key)
+        {
+            _tags.Remove(key);
+        }
+
+
+        public void SetTags(Dictionary<string, string> newTags)
+        {
+            _tags = newTags;
         }
 
         public void SetExtras(Dictionary<string, object> _extras)
@@ -158,6 +172,7 @@ namespace Crittr
 
         public string ToJson()
         {
+            tags = CrittrUtils.Json.Serialize(_tags);
             return JsonUtility.ToJson(this);
         }
     }

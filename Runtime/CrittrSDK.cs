@@ -17,11 +17,6 @@ public class CrittrEventReportFailure : UnityEvent<Report, ErrorResponse> { }
 public class CrittrSDK : MonoBehaviour
 {
     [SerializeField]
-    public Dictionary<string, string> tags = new Dictionary<string, string>();
-    [SerializeField]
-    public Dictionary<string, object> extras = new Dictionary<string, object>();
-
-    [SerializeField]
     [Header("Connection URI with API Key")]
     public string ConnectionURI;
 
