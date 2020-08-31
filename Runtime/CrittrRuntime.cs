@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -31,8 +32,8 @@ namespace Crittr {
         public int status;
         public string type;
         public string field;
-
     }
+
     [Serializable]
     public struct ErrorResponse {
         public int status;
@@ -204,7 +205,8 @@ namespace Crittr {
                     {
                         Debug.LogWarning("Error sending report: " + www.downloadHandler.text);
                     }
-                    ErrorResponse errorResponse = new ErrorResponse {errors = new ErrorMessage[]{}, status = 500};
+                    ErrorMessage defaultErrorMessage = new ErrorMessage { message = "Server not responding", status = 500 };
+                    ErrorResponse errorResponse = new ErrorResponse {errors = new ErrorMessage[]{defaultErrorMessage}, status = 500};
                     try
                     {
                         errorResponse = JsonUtility.FromJson<ErrorResponse>(www.downloadHandler.text);
@@ -270,8 +272,9 @@ namespace Crittr {
             formData.Add(new MultipartFormFileSection("attachment_file", data, filename, ""));
 
             APIProperties apiProperties = new APIProperties(_connectionURI);
-            var url = apiProperties.BaseURI + uploadLink.href;
-            var www = UnityWebRequest.Post(url, formData);
+            var href = new Uri(uploadLink.href, UriKind.Relative);
+            var builder = new Uri(apiProperties.BaseURI.Uri, href);
+            var www = UnityWebRequest.Post(builder.ToString(), formData);
 
             // 60 Seconds timeout.
             www.timeout = 60;

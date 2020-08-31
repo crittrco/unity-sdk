@@ -4,11 +4,12 @@ using Crittr;
 using System;
 using UnityEngine.UI;
 using UnityEngine.Events;
+using UnityEngine.EventSystems;
 
 [Serializable]
 public class ClearScreensEvent : UnityEvent { };
 
-public class CrittrUIManager : MonoBehaviour
+public class CrittrUIManager : MonoBehaviour, ICancelHandler 
 {
     public GameObject panel;
     public GameObject formScreen;
@@ -108,7 +109,7 @@ public class CrittrUIManager : MonoBehaviour
 
     public void HandleShowFailure(Report _, ErrorResponse errorResponse)
     {
-        var text = failureScreen.GetComponent<Text>();
+        var text = failureScreen.GetComponentInChildren<Text>();
         if (errorResponse.errors.Length > 0)
         {
             text.text = errorResponse.errors[0].message;
@@ -118,6 +119,7 @@ public class CrittrUIManager : MonoBehaviour
 
     private void ShowScreen(GameObject screen)
     {
+        EventSystem.current.SetSelectedGameObject(this.gameObject);
         panel.SetActive(true);
         screen.SetActive(true);
     }
@@ -133,5 +135,10 @@ public class CrittrUIManager : MonoBehaviour
         _qrCodeRawImage.texture = null;
         // Trigger event.
         OnClearedScreens?.Invoke();
+    }
+
+    public void OnCancel(BaseEventData _)
+    {
+        ClearScreens();
     }
 }
