@@ -10,6 +10,7 @@ namespace Crittr.UI
     [Serializable]
     public class ClearScreensEvent : UnityEvent { };
 
+    [HelpURL("https://docs.crittr.co/#/unity-sdk")]
     public class CrittrUI : MonoBehaviour, ICancelHandler
     {
         [Header("Panels")]
@@ -167,4 +168,3 @@ namespace Crittr.UI
         }
     }
 }
-
