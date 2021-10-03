@@ -10,7 +10,7 @@ namespace Crittr.UI
     [Serializable]
     public class ClearScreensEvent : UnityEvent { };
 
-    public class CrittrUIManager : MonoBehaviour, ICancelHandler
+    public class CrittrUI : MonoBehaviour, ICancelHandler
     {
         [Header("Panels")]
         [Tooltip("The main panel of the report window.")]
@@ -46,6 +46,13 @@ namespace Crittr.UI
             //If the SDK was not sent, then try to find it automatically
             if(_crittrSDK == null)
                 _crittrSDK = FindObjectOfType<CrittrSDK>();
+            //If the SDK is still null (I know for sure there's a better way to do this) then disable the script since it might cause problems.
+            if (_crittrSDK == null)
+            {
+                Debug.LogError("The CrittrSDK was not present in the scene!");
+                this.enabled = false;
+            }
+                
 
             //Get the category chooser from the formscreen
             _categoryDropdown = formScreen.GetComponentInChildren<Dropdown>();
