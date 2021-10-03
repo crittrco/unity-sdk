@@ -24,7 +24,8 @@ namespace Crittr.UI
         public GameObject failureScreen;
         [Header("Configuration")]
         public CrittrSDK _crittrSDK;
-        public GameObject successQRCode;
+        [SerializeField]
+        private RawImage successQRCode;
 
         [SerializeField]
         public ClearScreensEvent OnClearedScreens;
@@ -33,7 +34,7 @@ namespace Crittr.UI
         [NonSerialized]
         private Report _currentReport = null;
         private string _reportLocation;
-        private RawImage _qrCodeRawImage;
+        
         //If you want to use TextMeshPro, add TMP_ before Dropdown.
         private Dropdown _categoryDropdown;
 
@@ -42,7 +43,8 @@ namespace Crittr.UI
             //Just as a double-check, set the current report to null.
             _currentReport = null;
             //Get the raw image of the gameobject
-            _qrCodeRawImage = successQRCode.GetComponent<RawImage>();
+            if(successQRCode == null)
+                successQRCode = panel.GetComponentInChildren<RawImage>();
 
             //If the SDK was not sent, then try to find it automatically
             if(_crittrSDK == null)
@@ -124,7 +126,7 @@ namespace Crittr.UI
                 yield return null;
             }
 
-            _qrCodeRawImage.texture = ((UnityEngine.Networking.DownloadHandlerTexture)request.downloadHandler).texture;
+            successQRCode.texture = ((UnityEngine.Networking.DownloadHandlerTexture)request.downloadHandler).texture;
         }
 
         public void HandleReportLinkClick()
@@ -157,7 +159,7 @@ namespace Crittr.UI
             successScreen.SetActive(false);
             failureScreen.SetActive(false);
             _currentReport = null;
-            _qrCodeRawImage.texture = null;
+            successQRCode.texture = null;
             // Trigger event.
             OnClearedScreens?.Invoke();
         }
